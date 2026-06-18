@@ -30,7 +30,6 @@ import {
   Fade,
   Chip,
   Card,
-  CardContent,
   LinearProgress,
   AppBar,
   Toolbar,
@@ -517,30 +516,95 @@ const App: React.FC = () => {
           </Alert>
         )}
 
-        {/* Поиск */}
-        <Card sx={{ mb: 3, borderRadius: 3, p: 2 }}>
-          <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-            <TextField
-              placeholder="Поиск по наименованию или маркировке..."
-              variant="outlined"
-              size="small"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              sx={{ flex: 1, minWidth: 200 }}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon sx={{ color: '#667eea' }} />
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            />
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Typography variant="body2" sx={{ alignSelf: 'center' }}>
-                Всего: {components.length}
+        {/* Заголовок-карточка */}
+        <Card sx={{ 
+          mb: 4, 
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: 3,
+          p: 3,
+        }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+            <Box>
+              <Typography variant="h3" component="h1" sx={{ 
+                fontWeight: 'bold',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                color: 'transparent',
+                mb: 1,
+              }}>
+                Электронные компоненты
               </Typography>
+              <Typography variant="subtitle1" sx={{ color: 'text.secondary' }}>
+                Управление складом электронных компонентов
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={2}>
+              <TextField
+                placeholder="Поиск по наименованию или маркировке..."
+                variant="outlined"
+                size="medium"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                sx={{ 
+                  width: 350,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 3,
+                    backgroundColor: 'white',
+                  }
+                }}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon sx={{ color: '#667eea' }} />
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+              <Button 
+                variant="contained" 
+                startIcon={<AddIcon />} 
+                onClick={handleAddNew}
+                sx={{ 
+                  borderRadius: 3,
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  boxShadow: '0 4px 15px rgba(102,126,234,0.4)',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 6px 20px rgba(102,126,234,0.6)',
+                  },
+                  transition: 'all 0.3s ease',
+                }}
+              >
+                Добавить компонент
+              </Button>
+            </Stack>
+          </Box>
+        </Card>
+
+        {/* Статистика */}
+        <Card sx={{ mb: 3, borderRadius: 3, p: 2 }}>
+          <Stack direction="row" spacing={3} sx={{ justifyContent: 'space-around', flexWrap: 'wrap' }}>
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#667eea' }}>
+                {components.length}
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>Всего компонентов</Typography>
+            </Box>
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#764ba2' }}>
+                {components.reduce((sum, c) => sum + c.quantity, 0)}
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>Всего на складе</Typography>
+            </Box>
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#f093fb' }}>
+                {components.filter(c => c.quantity < 10).length}
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>Мало на складе</Typography>
             </Box>
           </Stack>
         </Card>
