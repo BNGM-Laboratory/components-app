@@ -47,17 +47,11 @@ import {
   CloudDownload as CloudDownloadIcon,
   PictureAsPdf as PdfIcon,
   Image as ImageIcon,
-  Upload as UploadIcon,
   Inventory as InventoryIcon,
-  Category as CategoryIcon,
-  Description as DescriptionIcon,
-  Storage as StorageIcon,
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
-  Link as LinkIcon,
   AccountCircle as AccountCircleIcon,
   ExitToApp as LogoutIcon,
-  Login as LoginIcon,
 } from '@mui/icons-material';
 import {
   collection,
@@ -68,17 +62,14 @@ import {
   onSnapshot,
   query,
   orderBy,
-  where,
-  getDocs,
-  setDoc,
 } from 'firebase/firestore';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  User,
 } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 import { db, auth } from './firebase';
 
 // ==================== Типы данных ====================
