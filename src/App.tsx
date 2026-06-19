@@ -432,7 +432,6 @@ const App: React.FC = () => {
       return;
     }
 
-    // Разбиваем по запятой, убираем пробелы, фильтруем пустые
     const markings = importText.split(',').map(m => m.trim()).filter(m => m.length > 0);
     if (markings.length === 0) {
       setSnackbar({ open: true, message: 'Не найдено ни одной маркировки', severity: 'warning' });
@@ -445,7 +444,7 @@ const App: React.FC = () => {
     try {
       for (const marking of markings) {
         const newComponent: Omit<Component, 'id'> = {
-          name: '',               // можно оставить пустым или задать значение по умолчанию
+          name: '',
           marking: marking,
           parameters: '',
           storageCell: '',
@@ -511,7 +510,7 @@ const App: React.FC = () => {
     const query = encodeURIComponent(`${component.name} ${component.marking} datasheet PDF`);
     const searchUrl = `https://www.google.com/search?q=${query}`;
     window.open(searchUrl, '_blank');
-    setSnackbar({ open: true, message: 'Поиск открыт в новой вкладке', severity: 'info' });
+    setSnackbar({ open: true, message: 'Поиск даташита открыт в новой вкладке', severity: 'info' });
   };
 
   const handleDatasheetClick = (component: Component) => {
@@ -743,21 +742,41 @@ const App: React.FC = () => {
                           },
                         }}
                       >
+                        {/* Наименование — редактирование */}
                         <TableCell onClick={() => handleEdit(comp)} sx={{ cursor: 'pointer', fontWeight: 500 }}>
                           {comp.name}
                         </TableCell>
-                        <TableCell onClick={() => handleEdit(comp)} sx={{ cursor: 'pointer' }}>
-                          <Chip label={comp.marking} size="small" sx={{ backgroundColor: alpha('#667eea', 0.1), color: '#667eea' }} />
+
+                        {/* Маркировка — ПОИСК ДАТАШИТА */}
+                        <TableCell onClick={() => handleSearchDatasheetOnline(comp)} sx={{ cursor: 'pointer' }}>
+                          <Chip
+                            label={comp.marking}
+                            size="small"
+                            sx={{ backgroundColor: alpha('#667eea', 0.1), color: '#667eea' }}
+                          />
                         </TableCell>
+
+                        {/* Параметры — редактирование */}
                         <TableCell onClick={() => handleEdit(comp)} sx={{ cursor: 'pointer' }}>
                           {comp.parameters}
                         </TableCell>
+
+                        {/* Вид — только увеличение изображения */}
                         <TableCell>
                           <ImageThumbnail src={comp.imageData} />
                         </TableCell>
+
+                        {/* Ячейка — редактирование */}
                         <TableCell onClick={() => handleEdit(comp)} sx={{ cursor: 'pointer' }}>
-                          <Chip label={comp.storageCell || '—'} size="small" variant="outlined" sx={{ borderColor: '#764ba2', color: '#764ba2' }} />
+                          <Chip
+                            label={comp.storageCell || '—'}
+                            size="small"
+                            variant="outlined"
+                            sx={{ borderColor: '#764ba2', color: '#764ba2' }}
+                          />
                         </TableCell>
+
+                        {/* Количество — редактирование */}
                         <TableCell onClick={() => handleEdit(comp)} sx={{ cursor: 'pointer' }}>
                           <Box>
                             <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
@@ -783,6 +802,8 @@ const App: React.FC = () => {
                             />
                           </Box>
                         </TableCell>
+
+                        {/* Даташит — кнопки */}
                         <TableCell>
                           <Stack direction="row" spacing={1}>
                             {comp.datasheetUrl ? (
@@ -808,11 +829,24 @@ const App: React.FC = () => {
                             )}
                           </Stack>
                         </TableCell>
+
+                        {/* Примечание — редактирование */}
                         <TableCell onClick={() => handleEdit(comp)} sx={{ cursor: 'pointer' }}>
-                          <Typography variant="body2" sx={{ color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 150 }}>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: 'text.secondary',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: 150,
+                            }}
+                          >
                             {comp.note}
                           </Typography>
                         </TableCell>
+
+                        {/* Действия — кнопки */}
                         <TableCell>
                           <Tooltip title="Редактировать">
                             <IconButton
