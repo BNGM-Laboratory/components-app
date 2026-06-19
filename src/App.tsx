@@ -51,6 +51,7 @@ import {
   Warning as WarningIcon,
   AccountCircle as AccountCircleIcon,
   ExitToApp as LogoutIcon,
+  FileUpload as FileUploadIcon,
 } from '@mui/icons-material';
 import {
   collection,
@@ -204,6 +205,11 @@ const App: React.FC = () => {
     note: '',
   });
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+
+  // === Состояния для диалога массового импорта ===
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importLoading, setImportLoading] = useState(false);
 
   // ========== Аутентификация ==========
   useEffect(() => {
@@ -414,6 +420,59 @@ const App: React.FC = () => {
     setAnchorEl(null);
   };
 
+  // ========== Обработчики массового импорта ==========
+  const handleOpenImportDialog = () => {
+    setImportText('');
+    setImportDialogOpen(true);
+  };
+
+  const handleImportMarkings = async () => {
+    if (!importText.trim()) {
+      setSnackbar({ open: true, message: 'Введите список маркировок', severity: 'warning' });
+      return;
+    }
+
+    // Разбиваем по запятой, убираем пробелы, фильтруем пустые
+    const markings = importText.split(',').map(m => m.trim()).filter(m => m.length > 0);
+    if (markings.length === 0) {
+      setSnackbar({ open: true, message: 'Не найдено ни одной маркировки', severity: 'warning' });
+      return;
+    }
+
+    setImportLoading(true);
+    let successCount = 0;
+
+    try {
+      for (const marking of markings) {
+        const newComponent: Omit<Component, 'id'> = {
+          name: '',               // можно оставить пустым или задать значение по умолчанию
+          marking: marking,
+          parameters: '',
+          storageCell: '',
+          quantity: 0,
+          note: '',
+          imageData: '',
+          datasheetFileName: '',
+          datasheetUrl: '',
+        };
+        await addComponent(newComponent);
+        successCount++;
+      }
+      setSnackbar({
+        open: true,
+        message: `Успешно импортировано ${successCount} маркировок`,
+        severity: 'success',
+      });
+      setImportDialogOpen(false);
+      setImportText('');
+    } catch (error) {
+      console.error('Ошибка импорта:', error);
+      setSnackbar({ open: true, message: 'Ошибка при импорте', severity: 'error' });
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   // ========== Вспомогательные компоненты ==========
   const ImageThumbnail: React.FC<{ src?: string }> = ({ src }) => {
     if (!src) return <Typography variant="body2" sx={{ color: 'text.secondary' }}>Нет фото</Typography>;
@@ -494,6 +553,14 @@ const App: React.FC = () => {
           <Button color="inherit" onClick={handleAddNew} startIcon={<AddIcon />} sx={{ color: '#667eea' }}>
             Добавить
           </Button>
+          <Button
+            variant="outlined"
+            startIcon={<FileUploadIcon />}
+            onClick={handleOpenImportDialog}
+            sx={{ color: '#764ba2', borderColor: '#764ba2', ml: 1 }}
+          >
+            Импорт
+          </Button>
           <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ ml: 2, color: '#667eea' }}>
             <AccountCircleIcon />
           </IconButton>
@@ -517,8 +584,8 @@ const App: React.FC = () => {
         )}
 
         {/* Заголовок-карточка */}
-        <Card sx={{ 
-          mb: 4, 
+        <Card sx={{
+          mb: 4,
           background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
           backdropFilter: 'blur(10px)',
           borderRadius: 3,
@@ -526,7 +593,7 @@ const App: React.FC = () => {
         }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
             <Box>
-              <Typography variant="h3" component="h1" sx={{ 
+              <Typography variant="h3" component="h1" sx={{
                 fontWeight: 'bold',
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 backgroundClip: 'text',
@@ -547,7 +614,7 @@ const App: React.FC = () => {
                 size="medium"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                sx={{ 
+                sx={{
                   width: 350,
                   '& .MuiOutlinedInput-root': {
                     borderRadius: 3,
@@ -564,11 +631,11 @@ const App: React.FC = () => {
                   },
                 }}
               />
-              <Button 
-                variant="contained" 
-                startIcon={<AddIcon />} 
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
                 onClick={handleAddNew}
-                sx={{ 
+                sx={{
                   borderRadius: 3,
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   boxShadow: '0 4px 15px rgba(102,126,234,0.4)',
@@ -873,6 +940,52 @@ const App: React.FC = () => {
               }}
             >
               Сохранить
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Диалог массового импорта маркировок */}
+        <Dialog
+          open={importDialogOpen}
+          onClose={() => setImportDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+            <Typography variant="h5">Импорт маркировок</Typography>
+          </DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Введите маркировки через запятую (каждая маркировка будет создана как отдельный компонент).
+              Остальные поля будут пустыми — вы сможете заполнить их позже.
+            </Typography>
+            <TextField
+              label="Список маркировок"
+              placeholder="Например: BC547, 2N2222, IRF540, 1N4148"
+              fullWidth
+              multiline
+              rows={6}
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              disabled={importLoading}
+            />
+            {importLoading && <CircularProgress size={24} sx={{ mt: 2 }} />}
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setImportDialogOpen(false)} disabled={importLoading}>
+              Отмена
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleImportMarkings}
+              disabled={importLoading || !importText.trim()}
+              sx={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                '&:hover': { transform: 'translateY(-2px)' },
+                transition: 'all 0.3s ease',
+              }}
+            >
+              Импортировать
             </Button>
           </DialogActions>
         </Dialog>
