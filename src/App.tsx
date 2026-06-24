@@ -554,7 +554,7 @@ const App: React.FC = () => {
           </Button>
           <Button
             variant="outlined"
-            startIcon={<FileUploadIcon />}
+            // startIcon={<FileUploadIcon />}
             onClick={handleOpenImportDialog}
             sx={{ color: '#764ba2', borderColor: '#764ba2', ml: 3 }}
           >
