@@ -51,7 +51,7 @@ import {
   Warning as WarningIcon,
   AccountCircle as AccountCircleIcon,
   ExitToApp as LogoutIcon,
-  FileUpload as FileUploadIcon,
+  // FileUpload as FileUploadIcon,
 } from '@mui/icons-material';
 import {
   collection,
