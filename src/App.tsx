@@ -556,11 +556,11 @@ const App: React.FC = () => {
             variant="outlined"
             startIcon={<FileUploadIcon />}
             onClick={handleOpenImportDialog}
-            sx={{ color: '#764ba2', borderColor: '#764ba2', ml: 2 }}
+            sx={{ color: '#764ba2', borderColor: '#764ba2', ml: 3 }}
           >
             Импорт
           </Button>
-          <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ ml: 2, color: '#667eea' }}>
+          <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ ml: 1, color: '#667eea' }}>
             <AccountCircleIcon />
           </IconButton>
           <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
