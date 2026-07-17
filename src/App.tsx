@@ -35,6 +35,9 @@ import {
   Toolbar,
   Menu,
   MenuItem,
+  FormControl,
+  InputLabel,
+  Select,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import {
@@ -51,7 +54,6 @@ import {
   Warning as WarningIcon,
   AccountCircle as AccountCircleIcon,
   ExitToApp as LogoutIcon,
-  // FileUpload as FileUploadIcon,
 } from '@mui/icons-material';
 import {
   collection,
@@ -62,6 +64,10 @@ import {
   onSnapshot,
   query,
   orderBy,
+  getDocs,
+  getDoc,
+  where,
+  setDoc,
 } from 'firebase/firestore';
 import {
   signInWithEmailAndPassword,
@@ -173,6 +179,222 @@ const AuthScreen: React.FC<{ onAuth: (user: User) => void }> = ({ onAuth }) => {
   );
 };
 
+// ==================== КОМПОНЕНТ АДМИН-ПАНЕЛИ ====================
+const AdminPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const [userEmail, setUserEmail] = useState('');
+  const [selectedRole, setSelectedRole] = useState('user');
+  const [result, setResult] = useState<{ message: string; success?: boolean } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<Array<{ id: string; email: string; role: string }>>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Загрузка списка всех пользователей
+  useEffect(() => {
+    const loadUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const usersRef = collection(db, 'users');
+        const snapshot = await getDocs(usersRef);
+        const userList: Array<{ id: string; email: string; role: string }> = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          userList.push({
+            id: doc.id,
+            email: data.email || 'Без email',
+            role: data.role || 'user',
+          });
+        });
+        setUsers(userList);
+      } catch (error) {
+        console.error('Ошибка загрузки пользователей:', error);
+        setResult({ message: 'Ошибка загрузки списка пользователей', success: false });
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    loadUsers();
+  }, []);
+
+  const updateRole = async () => {
+    if (!userEmail.trim()) {
+      setResult({ message: 'Введите email пользователя', success: false });
+      return;
+    }
+
+    setLoading(true);
+    setResult(null);
+
+    try {
+      // Находим пользователя по email
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', userEmail.trim()));
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        setResult({ message: `Пользователь с email "${userEmail}" не найден`, success: false });
+        setLoading(false);
+        return;
+      }
+
+      const uid = snapshot.docs[0].id;
+
+      // Обновляем роль
+      const userDocRef = doc(db, 'users', uid);
+      await updateDoc(userDocRef, {
+        role: selectedRole,
+        updatedAt: new Date(),
+      });
+
+      setResult({ message: `Роль для ${userEmail} обновлена на "${selectedRole}"`, success: true });
+      
+      // Обновляем список пользователей
+      setUsers((prev) =>
+        prev.map((u) => (u.id === uid ? { ...u, role: selectedRole } : u))
+      );
+      
+      setUserEmail('');
+    } catch (error: any) {
+      console.error('Ошибка обновления роли:', error);
+      setResult({ 
+        message: `Ошибка: ${error.message || 'Не удалось обновить роль'}`, 
+        success: false 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={true} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h5">👑 Управление правами пользователей</Typography>
+          <IconButton onClick={onClose} sx={{ color: 'white' }}>
+            <DeleteIcon />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+      
+      <DialogContent dividers>
+        <Stack spacing={3}>
+          {/* Форма назначения роли */}
+          <Paper sx={{ p: 2, backgroundColor: alpha('#667eea', 0.05) }}>
+            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+              Назначить роль пользователю
+            </Typography>
+            <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', gap: 2 }}>
+              <TextField
+                label="Email пользователя"
+                placeholder="example@mail.com"
+                value={userEmail}
+                onChange={(e) => setUserEmail(e.target.value)}
+                sx={{ flex: 1, minWidth: 200 }}
+                size="small"
+              />
+              <FormControl sx={{ minWidth: 150 }}>
+                <InputLabel>Роль</InputLabel>
+                <Select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  size="small"
+                  label="Роль"
+                >
+                  <MenuItem value="user">👤 Пользователь</MenuItem>
+                  <MenuItem value="moderator">🛡️ Модератор</MenuItem>
+                  <MenuItem value="admin">👑 Администратор</MenuItem>
+                </Select>
+              </FormControl>
+              <Button
+                variant="contained"
+                onClick={updateRole}
+                disabled={loading || !userEmail.trim()}
+                sx={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  '&:hover': { transform: 'translateY(-2px)' },
+                  transition: 'all 0.3s ease',
+                  minWidth: 150,
+                }}
+              >
+                {loading ? <CircularProgress size={24} /> : 'Назначить роль'}
+              </Button>
+            </Stack>
+            {result && (
+              <Alert severity={result.success ? 'success' : 'error'} sx={{ mt: 2 }}>
+                {result.message}
+              </Alert>
+            )}
+          </Paper>
+
+          {/* Список пользователей */}
+          <Box>
+            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+              Список пользователей
+            </Typography>
+            {loadingUsers ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                <CircularProgress />
+              </Box>
+            ) : users.length === 0 ? (
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Пользователи не найдены
+              </Typography>
+            ) : (
+              <TableContainer component={Paper} sx={{ maxHeight: 300 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Роль</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>UID</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {users.map((user) => (
+                      <TableRow key={user.id} hover>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <Chip
+                            label={user.role}
+                            size="small"
+                            sx={{
+                              backgroundColor:
+                                user.role === 'admin'
+                                  ? alpha('#f44336', 0.1)
+                                  : user.role === 'moderator'
+                                  ? alpha('#ff9800', 0.1)
+                                  : alpha('#4caf50', 0.1),
+                              color:
+                                user.role === 'admin'
+                                  ? '#f44336'
+                                  : user.role === 'moderator'
+                                  ? '#ff9800'
+                                  : '#4caf50',
+                              fontWeight: 'bold',
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            {user.id.substring(0, 12)}...
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Box>
+        </Stack>
+      </DialogContent>
+      
+      <DialogActions>
+        <Button onClick={onClose}>Закрыть</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 // ==================== Основной компонент ====================
 const App: React.FC = () => {
   const theme = useTheme();
@@ -205,6 +427,8 @@ const App: React.FC = () => {
     note: '',
   });
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [adminPanelOpen, setAdminPanelOpen] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   // === Состояния для диалога массового импорта ===
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -220,11 +444,42 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // ========== Загрузка роли текущего пользователя ==========
+  useEffect(() => {
+    if (!user) {
+      setCurrentUserRole(null);
+      return;
+    }
+    
+    const loadUserRole = async () => {
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+          setCurrentUserRole(docSnap.data()?.role || 'user');
+        } else {
+          // Если документа нет, создаем с ролью user
+          await setDoc(userDocRef, {
+            email: user.email,
+            role: 'user',
+            createdAt: new Date(),
+          });
+          setCurrentUserRole('user');
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки роли:', error);
+        setCurrentUserRole('user');
+      }
+    };
+    loadUserRole();
+  }, [user]);
+
   // ========== Загрузка данных из Firestore ==========
   useEffect(() => {
     if (!user) return;
 
-    const q = query(collection(db, 'components'), orderBy('createdAt', 'desc'));
+    const componentsRef = collection(db, 'components');
+    const q = query(componentsRef, orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const items: Component[] = [];
       snapshot.forEach((doc) => {
@@ -278,7 +533,8 @@ const App: React.FC = () => {
   // ========== CRUD операции ==========
   const addComponent = async (component: Omit<Component, 'id'>) => {
     try {
-      const docRef = await addDoc(collection(db, 'components'), {
+      const componentsRef = collection(db, 'components');
+      const docRef = await addDoc(componentsRef, {
         ...component,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -294,7 +550,8 @@ const App: React.FC = () => {
 
   const updateComponent = async (id: string, data: Partial<Component>) => {
     try {
-      await updateDoc(doc(db, 'components', id), {
+      const componentDocRef = doc(db, 'components', id);
+      await updateDoc(componentDocRef, {
         ...data,
         updatedAt: new Date(),
       });
@@ -308,7 +565,8 @@ const App: React.FC = () => {
 
   const deleteComponent = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'components', id));
+      const componentDocRef = doc(db, 'components', id);
+      await deleteDoc(componentDocRef);
       setSnackbar({ open: true, message: 'Компонент удалён', severity: 'success' });
     } catch (error) {
       console.error('Ошибка удаления:', error);
@@ -549,14 +807,30 @@ const App: React.FC = () => {
           <Typography variant="h6" sx={{ flexGrow: 1, color: '#667eea', fontWeight: 'bold' }}>
             📦 Electronics Components
           </Typography>
+          
+          {/* Кнопка админ-панели (только для администраторов) */}
+          {currentUserRole === 'admin' && (
+            <Button 
+              variant="outlined" 
+              onClick={() => setAdminPanelOpen(true)}
+              sx={{ 
+                color: '#764ba2', 
+                borderColor: '#764ba2', 
+                mr: 1,
+                '&:hover': { backgroundColor: alpha('#764ba2', 0.1) }
+              }}
+            >
+              👑 Админ-панель
+            </Button>
+          )}
+          
           <Button color="inherit" onClick={handleAddNew} startIcon={<AddIcon />} sx={{ color: '#667eea' }}>
             Добавить
           </Button>
           <Button
             variant="outlined"
-            // startIcon={<FileUploadIcon />}
             onClick={handleOpenImportDialog}
-            sx={{ color: '#764ba2', borderColor: '#764ba2', ml: 3 }}
+            sx={{ color: '#764ba2', borderColor: '#764ba2', ml: 1 }}
           >
             Импорт
           </Button>
@@ -1063,6 +1337,11 @@ const App: React.FC = () => {
             {snackbar.message}
           </Alert>
         </Snackbar>
+
+        {/* ========== АДМИН-ПАНЕЛЬ ========== */}
+        {adminPanelOpen && (
+          <AdminPanel onClose={() => setAdminPanelOpen(false)} />
+        )}
       </Container>
     </Box>
   );
