@@ -429,6 +429,7 @@ const App: React.FC = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [roleLoading, setRoleLoading] = useState(true);
 
   // === Состояния для диалога массового импорта ===
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -448,17 +449,22 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!user) {
       setCurrentUserRole(null);
+      setRoleLoading(false);
       return;
     }
     
     const loadUserRole = async () => {
+      setRoleLoading(true);
       try {
         const userDocRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(userDocRef);
+        
         if (docSnap.exists()) {
-          setCurrentUserRole(docSnap.data()?.role || 'user');
+          const role = docSnap.data()?.role || 'user';
+          console.log('Роль пользователя:', role);
+          setCurrentUserRole(role);
         } else {
-          // Если документа нет, создаем с ролью user
+          console.log('Создаем нового пользователя с ролью user');
           await setDoc(userDocRef, {
             email: user.email,
             role: 'user',
@@ -469,6 +475,8 @@ const App: React.FC = () => {
       } catch (error) {
         console.error('Ошибка загрузки роли:', error);
         setCurrentUserRole('user');
+      } finally {
+        setRoleLoading(false);
       }
     };
     loadUserRole();
@@ -586,12 +594,20 @@ const App: React.FC = () => {
   };
 
   const handleEdit = (component: Component) => {
+    if (currentUserRole !== 'admin') {
+      setSnackbar({ open: true, message: 'У вас нет прав для редактирования', severity: 'error' });
+      return;
+    }
     setEditingComponent(component);
     setFormData({ ...component });
     setModalOpen(true);
   };
 
   const handleAddNew = () => {
+    if (currentUserRole !== 'admin') {
+      setSnackbar({ open: true, message: 'У вас нет прав для добавления', severity: 'error' });
+      return;
+    }
     setEditingComponent(null);
     setFormData({
       name: '',
@@ -651,6 +667,10 @@ const App: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (currentUserRole !== 'admin') {
+      setSnackbar({ open: true, message: 'У вас нет прав для удаления', severity: 'error' });
+      return;
+    }
     if (window.confirm('Удалить компонент?')) {
       await deleteComponent(id);
     }
@@ -680,6 +700,10 @@ const App: React.FC = () => {
 
   // ========== Обработчики массового импорта ==========
   const handleOpenImportDialog = () => {
+    if (currentUserRole !== 'admin') {
+      setSnackbar({ open: true, message: 'У вас нет прав для импорта', severity: 'error' });
+      return;
+    }
     setImportText('');
     setImportDialogOpen(true);
   };
@@ -690,7 +714,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const markings = importText.split(',').map(m => m.trim()).filter(m => m.length > 0);
+    const markings = importText.split(',').map((m) => m.trim()).filter((m) => m.length > 0);
     if (markings.length === 0) {
       setSnackbar({ open: true, message: 'Не найдено ни одной маркировки', severity: 'warning' });
       return;
@@ -786,7 +810,7 @@ const App: React.FC = () => {
   }, [filteredComponents, page, rowsPerPage]);
 
   // ========== Загрузка ==========
-  if (loadingAuth) {
+  if (loadingAuth || roleLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
@@ -801,14 +825,12 @@ const App: React.FC = () => {
   // ========== Основной рендер ==========
   return (
     <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-      {/* App Bar */}
       <AppBar position="sticky" sx={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
         <Toolbar>
           <Typography variant="h6" sx={{ flexGrow: 1, color: '#667eea', fontWeight: 'bold' }}>
             📦 Electronics Components
           </Typography>
           
-          {/* Кнопка админ-панели (только для администраторов) */}
           {currentUserRole === 'admin' && (
             <Button 
               variant="outlined" 
@@ -824,13 +846,27 @@ const App: React.FC = () => {
             </Button>
           )}
           
-          <Button color="inherit" onClick={handleAddNew} startIcon={<AddIcon />} sx={{ color: '#667eea' }}>
+          <Button 
+            color="inherit" 
+            onClick={handleAddNew} 
+            startIcon={<AddIcon />} 
+            sx={{ 
+              color: currentUserRole === 'admin' ? '#667eea' : '#999',
+              cursor: currentUserRole === 'admin' ? 'pointer' : 'not-allowed',
+              opacity: currentUserRole === 'admin' ? 1 : 0.6
+            }}
+          >
             Добавить
           </Button>
           <Button
             variant="outlined"
             onClick={handleOpenImportDialog}
-            sx={{ color: '#764ba2', borderColor: '#764ba2', ml: 1 }}
+            sx={{ 
+              color: currentUserRole === 'admin' ? '#764ba2' : '#999',
+              borderColor: currentUserRole === 'admin' ? '#764ba2' : '#ccc',
+              ml: 1,
+              opacity: currentUserRole === 'admin' ? 1 : 0.6
+            }}
           >
             Импорт
           </Button>
@@ -841,6 +877,11 @@ const App: React.FC = () => {
             <MenuItem disabled>
               <Typography variant="body2">{user.email}</Typography>
             </MenuItem>
+            <MenuItem disabled>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                Роль: {currentUserRole || 'не определена'}
+              </Typography>
+            </MenuItem>
             <MenuItem onClick={handleLogout}>
               <LogoutIcon fontSize="small" sx={{ mr: 1 }} /> Выйти
             </MenuItem>
@@ -849,14 +890,12 @@ const App: React.FC = () => {
       </AppBar>
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
-        {/* Индикатор офлайн */}
         {!isOnline && (
           <Alert icon={<CloudOffIcon />} severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
             Нет подключения к интернету. Данные будут синхронизированы при восстановлении соединения.
           </Alert>
         )}
 
-        {/* Заголовок-карточка */}
         <Card sx={{
           mb: 4,
           background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
@@ -904,28 +943,10 @@ const App: React.FC = () => {
                   },
                 }}
               />
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={handleAddNew}
-                sx={{
-                  borderRadius: 3,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  boxShadow: '0 4px 15px rgba(102,126,234,0.4)',
-                  '&:hover': {
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 6px 20px rgba(102,126,234,0.6)',
-                  },
-                  transition: 'all 0.3s ease',
-                }}
-              >
-                Добавить компонент
-              </Button>
             </Stack>
           </Box>
         </Card>
 
-        {/* Статистика */}
         <Card sx={{ mb: 3, borderRadius: 3, p: 2 }}>
           <Stack direction="row" spacing={3} sx={{ justifyContent: 'space-around', flexWrap: 'wrap' }}>
             <Box sx={{ textAlign: 'center' }}>
@@ -942,14 +963,13 @@ const App: React.FC = () => {
             </Box>
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#f093fb' }}>
-                {components.filter(c => c.quantity < 10).length}
+                {components.filter((c) => c.quantity < 10).length}
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>Мало на складе</Typography>
             </Box>
           </Stack>
         </Card>
 
-        {/* Таблица */}
         <Paper sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.1)' }}>
           <TableContainer>
             <Table>
@@ -1004,6 +1024,8 @@ const App: React.FC = () => {
                 ) : (
                   paginatedComponents.map((comp) => {
                     const stockStatus = getStockStatus(comp.quantity);
+                    const isAdmin = currentUserRole === 'admin';
+                    
                     return (
                       <TableRow
                         key={comp.id}
@@ -1016,12 +1038,17 @@ const App: React.FC = () => {
                           },
                         }}
                       >
-                        {/* Наименование — редактирование */}
-                        <TableCell onClick={() => handleEdit(comp)} sx={{ cursor: 'pointer', fontWeight: 500 }}>
+                        <TableCell 
+                          onClick={() => isAdmin && handleEdit(comp)} 
+                          sx={{ 
+                            cursor: isAdmin ? 'pointer' : 'default',
+                            fontWeight: 500,
+                            color: !isAdmin ? 'text.secondary' : 'inherit'
+                          }}
+                        >
                           {comp.name}
                         </TableCell>
 
-                        {/* Маркировка — ПОИСК ДАТАШИТА */}
                         <TableCell onClick={() => handleSearchDatasheetOnline(comp)} sx={{ cursor: 'pointer' }}>
                           <Chip
                             label={comp.marking}
@@ -1030,18 +1057,21 @@ const App: React.FC = () => {
                           />
                         </TableCell>
 
-                        {/* Параметры — редактирование */}
-                        <TableCell onClick={() => handleEdit(comp)} sx={{ cursor: 'pointer' }}>
+                        <TableCell 
+                          onClick={() => isAdmin && handleEdit(comp)} 
+                          sx={{ cursor: isAdmin ? 'pointer' : 'default' }}
+                        >
                           {comp.parameters}
                         </TableCell>
 
-                        {/* Вид — только увеличение изображения */}
                         <TableCell>
                           <ImageThumbnail src={comp.imageData} />
                         </TableCell>
 
-                        {/* Ячейка — редактирование */}
-                        <TableCell onClick={() => handleEdit(comp)} sx={{ cursor: 'pointer' }}>
+                        <TableCell 
+                          onClick={() => isAdmin && handleEdit(comp)} 
+                          sx={{ cursor: isAdmin ? 'pointer' : 'default' }}
+                        >
                           <Chip
                             label={comp.storageCell || '—'}
                             size="small"
@@ -1050,8 +1080,10 @@ const App: React.FC = () => {
                           />
                         </TableCell>
 
-                        {/* Количество — редактирование */}
-                        <TableCell onClick={() => handleEdit(comp)} sx={{ cursor: 'pointer' }}>
+                        <TableCell 
+                          onClick={() => isAdmin && handleEdit(comp)} 
+                          sx={{ cursor: isAdmin ? 'pointer' : 'default' }}
+                        >
                           <Box>
                             <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                               {comp.quantity} шт.
@@ -1077,7 +1109,6 @@ const App: React.FC = () => {
                           </Box>
                         </TableCell>
 
-                        {/* Даташит — кнопки */}
                         <TableCell>
                           <Stack direction="row" spacing={1}>
                             {comp.datasheetUrl ? (
@@ -1104,8 +1135,10 @@ const App: React.FC = () => {
                           </Stack>
                         </TableCell>
 
-                        {/* Примечание — редактирование */}
-                        <TableCell onClick={() => handleEdit(comp)} sx={{ cursor: 'pointer' }}>
+                        <TableCell 
+                          onClick={() => isAdmin && handleEdit(comp)} 
+                          sx={{ cursor: isAdmin ? 'pointer' : 'default' }}
+                        >
                           <Typography
                             variant="body2"
                             sx={{
@@ -1120,26 +1153,33 @@ const App: React.FC = () => {
                           </Typography>
                         </TableCell>
 
-                        {/* Действия — кнопки */}
                         <TableCell>
-                          <Tooltip title="Редактировать">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleEdit(comp)}
-                              sx={{ color: '#667eea', '&:hover': { backgroundColor: alpha('#667eea', 0.1) } }}
-                            >
-                              <EditIcon />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Удалить">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDelete(comp.id!)}
-                              sx={{ color: '#f44336', '&:hover': { backgroundColor: alpha('#f44336', 0.1) } }}
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </Tooltip>
+                          {isAdmin ? (
+                            <>
+                              <Tooltip title="Редактировать">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleEdit(comp)}
+                                  sx={{ color: '#667eea', '&:hover': { backgroundColor: alpha('#667eea', 0.1) } }}
+                                >
+                                  <EditIcon />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Удалить">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDelete(comp.id!)}
+                                  sx={{ color: '#f44336', '&:hover': { backgroundColor: alpha('#f44336', 0.1) } }}
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          ) : (
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                              Только чтение
+                            </Typography>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -1163,7 +1203,6 @@ const App: React.FC = () => {
           />
         </Paper>
 
-        {/* Модальное окно добавления/редактирования */}
         <Dialog open={modalOpen} onClose={() => setModalOpen(false)} maxWidth="md" fullWidth>
           <DialogTitle sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
             <Typography variant="h5">
@@ -1252,7 +1291,6 @@ const App: React.FC = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Диалог массового импорта маркировок */}
         <Dialog
           open={importDialogOpen}
           onClose={() => setImportDialogOpen(false)}
@@ -1298,7 +1336,6 @@ const App: React.FC = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Модальное окно увеличения изображения */}
         <Modal
           open={imageZoomOpen}
           onClose={() => setImageZoomOpen(false)}
@@ -1326,7 +1363,6 @@ const App: React.FC = () => {
           </Fade>
         </Modal>
 
-        {/* Snackbar */}
         <Snackbar
           open={snackbar.open}
           autoHideDuration={4000}
@@ -1338,7 +1374,6 @@ const App: React.FC = () => {
           </Alert>
         </Snackbar>
 
-        {/* ========== АДМИН-ПАНЕЛЬ ========== */}
         {adminPanelOpen && (
           <AdminPanel onClose={() => setAdminPanelOpen(false)} />
         )}
